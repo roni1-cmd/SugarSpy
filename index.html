@@ -165,7 +165,7 @@
 
           // Parse the text to find sugar and total carbohydrates
           const sugar = extractValue(extractedText, /sugar.*?(\d+)\s*g/i);
-          const carbs = extractValue(extractedText, /total carbohydrates.*?(\d+)\s*g/i);
+          const carbs = extractValue(extractedText, /total\s*carbohydrates.*?(\d+)\s*g/i);
 
           // Display the extracted values
           sugarValue.textContent = sugar || 'Not found';
