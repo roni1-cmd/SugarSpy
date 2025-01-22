@@ -181,8 +181,11 @@
       result.style.display = 'none';
 
       try {
-        // Convert the canvas image to a Blob
-        canvas.toBlob(async (blob) => {
+        // Preprocess the image
+        const processedImage = preprocessImage(canvas);
+
+        // Convert the processed image to a Blob
+        processedImage.toBlob(async (blob) => {
           const formData = new FormData();
           formData.append('file', blob, 'capture.jpg');
           formData.append('apikey', apiKey);
@@ -226,6 +229,42 @@
         loading.style.display = 'none';
       }
     });
+
+    // Function to preprocess the image
+    function preprocessImage(canvas) {
+      const context = canvas.getContext('2d');
+      const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
+
+      // Convert to grayscale
+      for (let i = 0; i < imageData.data.length; i += 4) {
+        const avg = (imageData.data[i] + imageData.data[i + 1] + imageData.data[i + 2]) / 3;
+        imageData.data[i] = avg; // Red
+        imageData.data[i + 1] = avg; // Green
+        imageData.data[i + 2] = avg; // Blue
+      }
+
+      // Apply contrast adjustment
+      const contrast = 1.5; // Increase contrast
+      for (let i = 0; i < imageData.data.length; i += 4) {
+        imageData.data[i] = ((imageData.data[i] / 255 - 0.5) * contrast + 0.5) * 255;
+        imageData.data[i + 1] = ((imageData.data[i + 1] / 255 - 0.5) * contrast + 0.5) * 255;
+        imageData.data[i + 2] = ((imageData.data[i + 2] / 255 - 0.5) * contrast + 0.5) * 255;
+      }
+
+      // Apply binarization (thresholding)
+      const threshold = 128;
+      for (let i = 0; i < imageData.data.length; i += 4) {
+        const avg = (imageData.data[i] + imageData.data[i + 1] + imageData.data[i + 2]) / 3;
+        const value = avg > threshold ? 255 : 0;
+        imageData.data[i] = value; // Red
+        imageData.data[i + 1] = value; // Green
+        imageData.data[i + 2] = value; // Blue
+      }
+
+      // Put the processed image data back on the canvas
+      context.putImageData(imageData, 0, 0);
+      return canvas;
+    }
 
     // Function to extract values using regex
     function extractValue(text, regex) {
