@@ -88,6 +88,8 @@
     const sugarValue = document.getElementById('sugarValue');
     const carbsValue = document.getElementById('carbsValue');
 
+    let stream;
+
     async function startCamera() {
       try {
         // Use the rear camera (main camera) by setting facingMode to "environment"
@@ -95,9 +97,18 @@
           video: {
             facingMode: "environment", // Use the rear camera
           },
+          advanced: [{ torch: true }], // Request torch mode (flash)
         };
-        const stream = await navigator.mediaDevices.getUserMedia(constraints);
+        stream = await navigator.mediaDevices.getUserMedia(constraints);
         video.srcObject = stream;
+
+        // Enable torch (flash) if supported
+        const track = stream.getVideoTracks()[0];
+        if (track && track.getCapabilities().torch) {
+          track.applyConstraints({ advanced: [{ torch: true }] });
+        } else {
+          console.warn('Torch (flash) is not supported on this device.');
+        }
       } catch (error) {
         console.error('Error accessing the camera:', error);
         alert('Unable to access the camera. Please ensure you have granted permission.');
@@ -165,6 +176,13 @@
 
     // Start the camera when the page loads
     startCamera();
+
+    // Clean up the stream when the page is closed
+    window.addEventListener('beforeunload', () => {
+      if (stream) {
+        stream.getTracks().forEach(track => track.stop());
+      }
+    });
   </script>
 </body>
 </html>
