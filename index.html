@@ -44,7 +44,7 @@
       border-radius: 5px;
       cursor: pointer;
       font-size: 16px;
-      margin-bottom: 20px;
+      margin-bottom: 10px;
     }
 
     button:hover {
@@ -61,18 +61,37 @@
       display: none;
       margin-top: 20px;
     }
+
+    .controls {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 20px;
+    }
+
+    .controls button {
+      flex: 1;
+      margin: 0 5px;
+    }
   </style>
 </head>
 <body>
   <div class="container">
     <h1>Camera OCR for Nutrition Facts</h1>
     <video id="cameraFeed" autoplay></video>
+    <div class="controls">
+      <button id="zoomInButton">Zoom In</button>
+      <button id="zoomOutButton">Zoom Out</button>
+      <button id="toggleTorchButton">Toggle Torch</button>
+    </div>
     <button id="captureButton">Capture Image</button>
     <div id="loading">Processing... Please wait.</div>
     <div id="result">
       <h2>Extracted Values:</h2>
+      <p><strong>Total Carbohydrates:</strong> <span id="carbsValue">-</span> g</p>
       <p><strong>Sugar:</strong> <span id="sugarValue">-</span> g</p>
-      <p><strong>Carbohydrates:</strong> <span id="carbsValue">-</span> g</p>
+      <p><strong>Calories:</strong> <span id="caloriesValue">-</span> kcal</p>
+      <p><strong>Protein:</strong> <span id="proteinValue">-</span> g</p>
+      <p><strong>Fat:</strong> <span id="fatValue">-</span> g</p>
     </div>
   </div>
 
@@ -83,12 +102,21 @@
     // Access the camera and display the feed
     const video = document.getElementById('cameraFeed');
     const captureButton = document.getElementById('captureButton');
+    const zoomInButton = document.getElementById('zoomInButton');
+    const zoomOutButton = document.getElementById('zoomOutButton');
+    const toggleTorchButton = document.getElementById('toggleTorchButton');
     const loading = document.getElementById('loading');
     const result = document.getElementById('result');
-    const sugarValue = document.getElementById('sugarValue');
     const carbsValue = document.getElementById('carbsValue');
+    const sugarValue = document.getElementById('sugarValue');
+    const caloriesValue = document.getElementById('caloriesValue');
+    const proteinValue = document.getElementById('proteinValue');
+    const fatValue = document.getElementById('fatValue');
 
     let stream;
+    let track;
+    let torchEnabled = false;
+    let zoomLevel = 1;
 
     async function startCamera() {
       try {
@@ -97,23 +125,48 @@
           video: {
             facingMode: "environment", // Use the rear camera
           },
-          advanced: [{ torch: true }], // Request torch mode (flash)
         };
         stream = await navigator.mediaDevices.getUserMedia(constraints);
         video.srcObject = stream;
 
-        // Enable torch (flash) if supported
-        const track = stream.getVideoTracks()[0];
-        if (track && track.getCapabilities().torch) {
-          track.applyConstraints({ advanced: [{ torch: true }] });
-        } else {
-          console.warn('Torch (flash) is not supported on this device.');
-        }
+        // Get the video track
+        track = stream.getVideoTracks()[0];
       } catch (error) {
         console.error('Error accessing the camera:', error);
         alert('Unable to access the camera. Please ensure you have granted permission.');
       }
     }
+
+    // Toggle torch (flash)
+    toggleTorchButton.addEventListener('click', () => {
+      if (track && track.getCapabilities().torch) {
+        torchEnabled = !torchEnabled;
+        track.applyConstraints({ advanced: [{ torch: torchEnabled }] });
+        toggleTorchButton.textContent = torchEnabled ? 'Turn Off Torch' : 'Turn On Torch';
+      } else {
+        alert('Torch (flash) is not supported on this device.');
+      }
+    });
+
+    // Zoom in
+    zoomInButton.addEventListener('click', () => {
+      if (track && track.getCapabilities().zoom) {
+        zoomLevel = Math.min(zoomLevel + 0.5, track.getCapabilities().zoom.max);
+        track.applyConstraints({ advanced: [{ zoom: zoomLevel }] });
+      } else {
+        alert('Zoom is not supported on this device.');
+      }
+    });
+
+    // Zoom out
+    zoomOutButton.addEventListener('click', () => {
+      if (track && track.getCapabilities().zoom) {
+        zoomLevel = Math.max(zoomLevel - 0.5, track.getCapabilities().zoom.min);
+        track.applyConstraints({ advanced: [{ zoom: zoomLevel }] });
+      } else {
+        alert('Zoom is not supported on this device.');
+      }
+    });
 
     // Capture an image from the camera feed
     captureButton.addEventListener('click', async () => {
@@ -150,13 +203,19 @@
           // Extract text from the OCR result
           const extractedText = data.ParsedResults[0].ParsedText;
 
-          // Parse the text to find sugar and carbohydrates
+          // Parse the text to find nutrition facts
+          const totalCarbs = extractValue(extractedText, /total carbohydrates.*?(\d+)\s*g/i);
           const sugar = extractValue(extractedText, /sugar.*?(\d+)\s*g/i);
-          const carbs = extractValue(extractedText, /carbohydrates.*?(\d+)\s*g/i);
+          const calories = extractValue(extractedText, /calories.*?(\d+)\s*kcal/i);
+          const protein = extractValue(extractedText, /protein.*?(\d+)\s*g/i);
+          const fat = extractValue(extractedText, /fat.*?(\d+)\s*g/i);
 
           // Display the extracted values
+          carbsValue.textContent = totalCarbs || 'Not found';
           sugarValue.textContent = sugar || 'Not found';
-          carbsValue.textContent = carbs || 'Not found';
+          caloriesValue.textContent = calories || 'Not found';
+          proteinValue.textContent = protein || 'Not found';
+          fatValue.textContent = fat || 'Not found';
           result.style.display = 'block';
         }, 'image/jpeg', 0.9); // Specify image format and quality
       } catch (error) {
