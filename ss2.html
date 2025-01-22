@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Camera OCR for Nutrition Facts</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background-color: #f4f4f4;
+      margin: 0;
+      padding: 0;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+    }
+
+    .container {
+      background-color: #fff;
+      padding: 20px;
+      border-radius: 10px;
+      box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+      text-align: center;
+      max-width: 500px;
+      width: 100%;
+    }
+
+    h1 {
+      margin-bottom: 20px;
+    }
+
+    video {
+      width: 100%;
+      border-radius: 10px;
+      margin-bottom: 20px;
+    }
+
+    button {
+      background-color: #007bff;
+      color: #fff;
+      border: none;
+      padding: 10px 20px;
+      border-radius: 5px;
+      cursor: pointer;
+      font-size: 16px;
+      margin-bottom: 20px;
+    }
+
+    button:hover {
+      background-color: #0056b3;
+    }
+
+    #result {
+      margin-top: 20px;
+      font-size: 18px;
+      text-align: left;
+    }
+
+    #loading {
+      display: none;
+      margin-top: 20px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Camera OCR for Nutrition Facts</h1>
+    <video id="cameraFeed" autoplay></video>
+    <button id="captureButton">Capture Image</button>
+    <div id="loading">Processing... Please wait.</div>
+    <div id="result">
+      <h2>Extracted Values:</h2>
+      <p><strong>Sugar:</strong> <span id="sugarValue">-</span> g</p>
+      <p><strong>Carbohydrates:</strong> <span id="carbsValue">-</span> g</p>
+    </div>
+  </div>
+
+  <script>
+    // Your OCR.space API key
+    const apiKey = 'K85349274788957';
+
+    // Access the camera and display the feed
+    const video = document.getElementById('cameraFeed');
+    const captureButton = document.getElementById('captureButton');
+    const loading = document.getElementById('loading');
+    const result = document.getElementById('result');
+    const sugarValue = document.getElementById('sugarValue');
+    const carbsValue = document.getElementById('carbsValue');
+
+    async function startCamera() {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+        video.srcObject = stream;
+      } catch (error) {
+        console.error('Error accessing the camera:', error);
+        alert('Unable to access the camera. Please ensure you have granted permission.');
+      }
+    }
+
+    // Capture an image from the camera feed
+    captureButton.addEventListener('click', async () => {
+      const canvas = document.createElement('canvas');
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      const context = canvas.getContext('2d');
+      context.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+      // Show loading message
+      loading.style.display = 'block';
+      result.style.display = 'none';
+
+      try {
+        // Convert the canvas image to a Blob
+        canvas.toBlob(async (blob) => {
+          const formData = new FormData();
+          formData.append('file', blob, 'capture.jpg');
+          formData.append('apikey', apiKey);
+          formData.append('language', 'eng'); // Set the language to English
+
+          // Send request to OCR.space API
+          const response = await fetch('https://api.ocr.space/parse/image', {
+            method: 'POST',
+            body: formData,
+          });
+
+          const data = await response.json();
+
+          if (data.IsErroredOnProcessing) {
+            throw new Error(data.ErrorMessage);
+          }
+
+          // Extract text from the OCR result
+          const extractedText = data.ParsedResults[0].ParsedText;
+
+          // Parse the text to find sugar and carbohydrates
+          const sugar = extractValue(extractedText, /sugar.*?(\d+)\s*g/i);
+          const carbs = extractValue(extractedText, /carbohydrates.*?(\d+)\s*g/i);
+
+          // Display the extracted values
+          sugarValue.textContent = sugar || 'Not found';
+          carbsValue.textContent = carbs || 'Not found';
+          result.style.display = 'block';
+        }, 'image/jpeg', 0.9); // Specify image format and quality
+      } catch (error) {
+        console.error('Error:', error);
+        alert('Error extracting text. Please try again.');
+      } finally {
+        // Hide loading message
+        loading.style.display = 'none';
+      }
+    });
+
+    // Function to extract values using regex
+    function extractValue(text, regex) {
+      const match = text.match(regex);
+      return match ? match[1] : null;
+    }
+
+    // Start the camera when the page loads
+    startCamera();
+  </script>
+</body>
+</html>
