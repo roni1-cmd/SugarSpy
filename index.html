@@ -72,7 +72,7 @@
     <div id="result">
       <h2>Extracted Values:</h2>
       <p><strong>Sugar:</strong> <span id="sugarValue">-</span> g</p>
-      <p><strong>Total Carbohydrates:</strong> <span id="carbsValue">-</span> g</p>
+      <p><strong>Carbohydrates:</strong> <span id="carbsValue">-</span> g</p>
     </div>
   </div>
 
@@ -97,24 +97,22 @@
           video: {
             facingMode: "environment", // Use the rear camera
           },
+          advanced: [{ torch: true }], // Request torch mode (flash)
         };
         stream = await navigator.mediaDevices.getUserMedia(constraints);
         video.srcObject = stream;
+
+        // Enable torch (flash) if supported
+        const track = stream.getVideoTracks()[0];
+        if (track && track.getCapabilities().torch) {
+          track.applyConstraints({ advanced: [{ torch: true }] });
+        } else {
+          console.warn('Torch (flash) is not supported on this device.');
+        }
       } catch (error) {
         console.error('Error accessing the camera:', error);
         alert('Unable to access the camera. Please ensure you have granted permission.');
       }
-    }
-
-    // Function to adjust image brightness
-    function adjustBrightness(imageData, brightness) {
-      const data = imageData.data;
-      for (let i = 0; i < data.length; i += 4) {
-        data[i] += brightness; // Red
-        data[i + 1] += brightness; // Green
-        data[i + 2] += brightness; // Blue
-      }
-      return imageData;
     }
 
     // Capture an image from the camera feed
@@ -124,11 +122,6 @@
       canvas.height = video.videoHeight;
       const context = canvas.getContext('2d');
       context.drawImage(video, 0, 0, canvas.width, canvas.height);
-
-      // Adjust brightness of the captured image
-      const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
-      const adjustedImageData = adjustBrightness(imageData, 50); // Increase brightness by 50
-      context.putImageData(adjustedImageData, 0, 0);
 
       // Show loading message
       loading.style.display = 'block';
@@ -150,22 +143,16 @@
 
           const data = await response.json();
 
-          // Debug: Log the raw OCR output
-          console.log('OCR Response:', data);
-
           if (data.IsErroredOnProcessing) {
-            throw new Error(data.ErrorMessage || 'OCR processing failed');
+            throw new Error(data.ErrorMessage);
           }
 
           // Extract text from the OCR result
           const extractedText = data.ParsedResults[0].ParsedText;
 
-          // Debug: Log the extracted text
-          console.log('Extracted Text:', extractedText);
-
-          // Parse the text to find sugar and total carbohydrates
+          // Parse the text to find sugar and carbohydrates
           const sugar = extractValue(extractedText, /sugar.*?(\d+)\s*g/i);
-          const carbs = extractValue(extractedText, /total\s*carbohydrates.*?(\d+)\s*g/i);
+          const carbs = extractValue(extractedText, /carbohydrates.*?(\d+)\s*g/i);
 
           // Display the extracted values
           sugarValue.textContent = sugar || 'Not found';
